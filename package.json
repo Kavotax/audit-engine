@@ -1,0 +1,20 @@
+{
+  "name": "auditor-engine",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "cookie-session": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "license-checker": "^25.0.1",
+    "multer": "^2.3.0",
+    "pupeteer": "^0.0.1"
+  }
+}
