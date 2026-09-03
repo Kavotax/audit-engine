@@ -83,12 +83,14 @@ app.get('/api/github/user-repos', async (req, res) => {
       return res.json({ authenticated: false, repos: [] });
     }
 
+
+
     const [userRes, reposRes] = await Promise.all([
       fetch('https://api.github.com/user', {
         headers: { 'Authorization': `Bearer ${token}`, 'User-Agent': 'AuditorEngine' }
       }),
-      fetch('https://api.github.com/user/repos?sort=updated&per_page=50', {
-        headers: { 'Authorization': `Bearer ${token}`, 'User-Agent': 'AuditorEngine' }
+      fetch('https://api.github.com/user/repos?visibility=all&affiliation=owner,collaborator,organization_member&sort=updated&per_page=100', {
+        headers: { 'Authorization': `Bearer ${token}`, 'User-Agent': 'AuditorEngine', 'Accept': 'application/vnd.github+json' }
       })
     ]);
 
@@ -97,8 +99,14 @@ app.get('/api/github/user-repos', async (req, res) => {
       return res.json({ authenticated: false, repos: [] });
     }
 
+      
+
     const userData = await userRes.json();
     const reposData = await reposRes.json();
+
+      console.log('Scopes del token:', userRes.headers.get('x-oauth-scopes'));
+    console.log('Status repos:', reposRes.status);
+    console.log('Total repos recibidos:', Array.isArray(reposData) ? reposData.length : reposData);
 
     return res.json({
       authenticated: true,
@@ -109,7 +117,11 @@ app.get('/api/github/user-repos', async (req, res) => {
         private: r.private,
         clone_url: r.clone_url
       })) : []
+      
     });
+
+    
+
   } catch (err) {
     console.error('Error en /api/github/user-repos:', err.message);
     return res.json({ authenticated: false, repos: [], error: err.message });

@@ -1,6 +1,6 @@
 {
   "projectType": "node",
-  "scannedAt": "2026-09-03T16:51:37.890Z",
+  "scannedAt": "2026-09-03T17:16:00.148Z",
   "standards": [
     "OWASP Top 10 Audited",
     "CWE Standards Compliance",
@@ -10,55 +10,25 @@
   "summary": {
     "passed": false,
     "statusBadge": "REQUIERE REVISIÓN",
-    "totalBlockers": 3,
+    "totalBlockers": 1,
     "totalWarnings": 14,
     "totalVulnerabilities": 0,
     "criticalVulns": 0,
     "highVulns": 0
   },
   "licenses": {
-    "totalFound": 9,
+    "totalFound": 1,
     "allLicenses": [
-      "ISC",
-      "MIT",
-      "UNKNOWN",
-      "BSD-2-Clause",
-      "BSD-3-Clause",
-      "Apache-2.0",
-      "CC-BY-3.0",
-      "CC0-1.0",
-      "(MIT AND CC-BY-3.0)"
+      "UNKNOWN"
     ],
     "hasRestrictedLicenses": false,
     "restrictedFound": []
   },
   "sast": {
-    "totalFindings": 17,
-    "blockersCount": 3,
+    "totalFindings": 15,
+    "blockersCount": 1,
     "warningsCount": 14,
     "blockers": [
-      {
-        "type": "sast",
-        "category": "Bloqueante",
-        "severity": "ERROR",
-        "ruleId": "generic.secrets.security.detected-generic-secret.detected-generic-secret",
-        "path": ".env",
-        "startLine": 2,
-        "message": "Generic Secret detected",
-        "owasp": "A07:2021 - Identification and Authentication Failures",
-        "cwe": "CWE-798: Use of Hard-coded Credentials"
-      },
-      {
-        "type": "sast",
-        "category": "Bloqueante",
-        "severity": "ERROR",
-        "ruleId": "generic.secrets.security.detected-generic-secret.detected-generic-secret",
-        "path": ".env",
-        "startLine": 3,
-        "message": "Generic Secret detected",
-        "owasp": "A07:2021 - Identification and Authentication Failures",
-        "cwe": "CWE-798: Use of Hard-coded Credentials"
-      },
       {
         "type": "sast",
         "category": "Bloqueante",
