@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 const AdmZip = require('adm-zip');
 
-// Ejecución segura sin invocación de sub-shell vulnerable
+// Safe execution without vulnerable sub-shell invocation
 function runSafeCommand(file, args, cwd, timeout = 120000) {
   return new Promise((resolve) => {
     execFile(
@@ -22,51 +22,51 @@ function runSafeCommand(file, args, cwd, timeout = 120000) {
   });
 }
 
-// Clonado local aprovechando SSH (~/.ssh) o Git Credential Manager del usuario
+// Local clone leveraging SSH (~/.ssh) or Git Credential Manager
 async function cloneRepoLocal(repoUrl) {
   const tempDir = path.join(os.tmpdir(), `audit-repo-${Date.now()}`);
-  console.log(`📥 Clonando repositorio remoto vía Git local (${repoUrl})...`);
+  console.log(`[INFO] Cloning remote repository via local Git (${repoUrl})...`);
 
   const cleanUrl = repoUrl.trim();
   const result = await runSafeCommand('git', ['clone', '--depth', '1', cleanUrl, tempDir], process.cwd());
 
   if (result.error && !fs.existsSync(tempDir)) {
     throw new Error(
-      `Error al clonar repositorio. Verifica tus llaves SSH, credenciales de Git o que la URL exista: ${result.stderr || result.stdout}`
+      `Failed to clone repository. Verify your SSH keys, Git credentials, or that the URL exists: ${result.stderr || result.stdout}`
     );
   }
 
-  // Generar lockfile sin ejecutar pre/post-install hooks maliciosos
+  // Generate lockfile without running potentially malicious pre/post-install hooks
   const hasPackageJson = fs.existsSync(path.join(tempDir, 'package.json'));
   const hasLockfile = fs.existsSync(path.join(tempDir, 'package-lock.json'));
 
   if (hasPackageJson && !hasLockfile) {
-    console.log('📦 Generando lockfile seguro para auditoría de dependencias...');
+    console.log('[INFO] Generating lockfile for dependency auditing...');
     await runSafeCommand('npm', ['install', '--package-lock-only', '--ignore-scripts'], tempDir);
   }
 
   return tempDir;
 }
 
-// Descompresión protegida contra Zip Slip y Zip Bombs
+// Decompression protected against Zip Slip and Zip Bombs
 function extractZipArchive(zipFilePath) {
   const tempDir = path.join(os.tmpdir(), `audit-zip-${Date.now()}`);
-  console.log(`📦 Descomprimiendo archivo ZIP (${zipFilePath})...`);
+  console.log(`[INFO] Extracting ZIP archive (${zipFilePath})...`);
 
   const resolvedZip = path.resolve(zipFilePath);
   if (!fs.existsSync(resolvedZip)) {
-    throw new Error(`El archivo .zip "${resolvedZip}" no existe.`);
+    throw new Error(`The .zip archive "${resolvedZip}" does not exist.`);
   }
 
   const zip = new AdmZip(resolvedZip);
   const zipEntries = zip.getEntries();
   const resolvedTempDir = path.resolve(tempDir);
 
-  // Validación anti Path-Traversal (Zip Slip)
+  // Path-Traversal validation (Zip Slip mitigation)
   for (const entry of zipEntries) {
     const targetPath = path.resolve(resolvedTempDir, entry.entryName);
     if (!targetPath.startsWith(resolvedTempDir + path.sep) && targetPath !== resolvedTempDir) {
-      throw new Error('Archivo ZIP malicioso detectado: intento de escape de directorio (Zip Slip).');
+      throw new Error('Malicious ZIP archive detected: attempted directory escape (Zip Slip).');
     }
   }
 
@@ -74,15 +74,15 @@ function extractZipArchive(zipFilePath) {
   return tempDir;
 }
 
-// Limpieza automática de directorios temporales
+// Cleanup of temporary working directories
 function cleanupTempDir(dirPath) {
   try {
     if (fs.existsSync(dirPath)) {
       fs.rmSync(dirPath, { recursive: true, force: true });
-      console.log('🧹 Directorio temporal limpiado con éxito.');
+      console.log('[INFO] Temporary directory cleaned up successfully.');
     }
   } catch (err) {
-    console.warn(`⚠️ No se pudo eliminar la carpeta temporal: ${err.message}`);
+    console.warn(`[WARN] Failed to delete temporary directory: ${err.message}`);
   }
 }
 
@@ -120,15 +120,15 @@ function scanCodeForSecrets(targetPath) {
 
   const secretPatterns = [
     {
-      name: 'API Key / Token asignado',
+      name: 'Hardcoded API Key / Token',
       regex: /(?:api_?key|app_?secret|auth_?token|client_?secret|jwt_?secret|private_?key|supabase_?key|stripe_?key)\s*[:=]\s*(["'`])([a-zA-Z0-9_\-\.]{16,})\1/gi
     },
     {
-      name: 'JWT Token expuesto',
+      name: 'Exposed JWT Token',
       regex: /eyJ[a-zA-Z0-9_-]{15,}\.[a-zA-Z0-9_-]{15,}\.[a-zA-Z0-9_-]{15,}/g
     },
     {
-      name: 'Clave privada RSA/SSH',
+      name: 'Private RSA/SSH Key',
       regex: /-----BEGIN (?:RSA )?PRIVATE KEY-----/g
     }
   ];
@@ -145,40 +145,45 @@ function scanCodeForSecrets(targetPath) {
         if (!['node_modules', '.git', 'vendor', 'dist', 'build', 'storage', '.next', '.turbo', '.output'].includes(entry.name)) {
           walkDir(fullPath);
         }
-      } else if (extensions.includes(path.extname(entry.name).toLowerCase())) {
-        const content = fs.readFileSync(fullPath, 'utf8');
-        const lines = content.split('\n');
+      } else {
+        // Ignore local environment files (.env, .env.local, etc.)
+        if (entry.name.startsWith('.env')) continue;
 
-        lines.forEach((line, index) => {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('#')) return;
+        if (extensions.includes(path.extname(entry.name).toLowerCase())) {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          const lines = content.split('\n');
 
-          const lowerLine = line.toLowerCase();
-          if (ignoredProperties.some(prop => lowerLine.includes(prop))) return;
+          lines.forEach((line, index) => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('#')) return;
 
-          for (const pattern of secretPatterns) {
-            pattern.regex.lastIndex = 0;
-            const match = pattern.regex.exec(line);
+            const lowerLine = line.toLowerCase();
+            if (ignoredProperties.some(prop => lowerLine.includes(prop))) return;
 
-            if (match) {
-              const secretCandidate = match[2] || match[0];
-              if (!isLikelyRealSecret(secretCandidate)) continue;
+            for (const pattern of secretPatterns) {
+              pattern.regex.lastIndex = 0;
+              const match = pattern.regex.exec(line);
 
-              findings.push({
-                type: 'secret',
-                category: 'Bloqueante',
-                severity: 'CRITICAL',
-                ruleId: `hardcoded-${pattern.name.toLowerCase().replace(/\s+/g, '-')}`,
-                path: path.relative(targetPath, fullPath),
-                startLine: index + 1,
-                message: `Credencial o clave hardcodeada detectada: "${pattern.name}". Debe transferirse a variables de entorno (.env).`,
-                cwe: 'CWE-798',
-                owasp: 'A07:2021-Identification and Authentication Failures'
-              });
-              break;
+              if (match) {
+                const secretCandidate = match[2] || match[0];
+                if (!isLikelyRealSecret(secretCandidate)) continue;
+
+                findings.push({
+                  type: 'secret',
+                  category: 'Blocker',
+                  severity: 'CRITICAL',
+                  ruleId: `hardcoded-${pattern.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+                  path: path.relative(targetPath, fullPath),
+                  startLine: index + 1,
+                  message: `Exposed credential detected: "${pattern.name}". Move this value to an environment variable (.env).`,
+                  cwe: 'CWE-798',
+                  owasp: 'A07:2021-Identification and Authentication Failures'
+                });
+                break;
+              }
             }
-          }
-        });
+          });
+        }
       }
     }
   }
@@ -186,7 +191,7 @@ function scanCodeForSecrets(targetPath) {
   try {
     walkDir(targetPath);
   } catch (e) {
-    console.warn('⚠️ Error al escanear secretos en archivos locales:', e.message);
+    console.warn(`[WARN] Failed to scan local files for secrets: ${e.message}`);
   }
 
   return findings;
@@ -205,7 +210,7 @@ function getSemgrepConfigs(projectType) {
 }
 
 async function runSemgrepScan(targetPath, projectType = 'static_web') {
-  console.log(`⚡ Ejecutando análisis estático (Semgrep con perfiles para ${projectType})...`);
+  console.log(`[INFO] Running static analysis (Semgrep with rulesets for ${projectType})...`);
   const cleanTarget = path.resolve(targetPath);
   const configs = getSemgrepConfigs(projectType);
 
@@ -218,9 +223,9 @@ async function runSemgrepScan(targetPath, projectType = 'static_web') {
     '--exclude=node_modules',
     '--exclude=vendor',
     '--exclude=storage',
+    '--exclude=.env*',
     '--json',
     '--quiet',
-    '--exclude=.env*',
     cleanTarget
   ];
 
@@ -232,7 +237,7 @@ async function runSemgrepScan(targetPath, projectType = 'static_web') {
       semgrepData = JSON.parse(semgrepResult.stdout);
     }
   } catch (e) {
-    console.warn('⚠️ No se pudo parsear salida de Semgrep.');
+    console.warn('[WARN] Could not parse Semgrep output.');
   }
 
   const semgrepFindings = (semgrepData.results || []).map(f => {
@@ -243,12 +248,12 @@ async function runSemgrepScan(targetPath, projectType = 'static_web') {
 
     return {
       type: 'sast',
-      category: isError ? 'Bloqueante' : 'Advertencia',
+      category: isError ? 'Blocker' : 'Warning',
       severity: isError ? 'ERROR' : 'WARNING',
       ruleId: f.check_id,
       path: path.relative(cleanTarget, f.path),
       startLine: f.start?.line || 1,
-      message: f.extra?.message?.trim() || 'Problema de seguridad o buena práctica detectado.',
+      message: f.extra?.message?.trim() || 'Security flaw or anti-pattern detected.',
       owasp,
       cwe
     };
@@ -257,8 +262,8 @@ async function runSemgrepScan(targetPath, projectType = 'static_web') {
   const localSecrets = scanCodeForSecrets(cleanTarget);
   const allFindings = [...localSecrets, ...semgrepFindings];
 
-  const blockers = allFindings.filter(f => f.category === 'Bloqueante');
-  const warnings = allFindings.filter(f => f.category === 'Advertencia');
+  const blockers = allFindings.filter(f => f.category === 'Blocker');
+  const warnings = allFindings.filter(f => f.category === 'Warning');
 
   return {
     totalFindings: allFindings.length,
@@ -270,7 +275,7 @@ async function runSemgrepScan(targetPath, projectType = 'static_web') {
 }
 
 async function auditStaticProject(targetPath) {
-  console.log('⚡ Ejecutando escaneo para Proyecto Estático (HTML/CSS/JS)...');
+  console.log('[INFO] Running scan for Static Web Project (HTML/CSS/JS)...');
   const sastReport = await runSemgrepScan(targetPath, 'static_web');
   const passed = sastReport.blockersCount === 0;
 
@@ -284,7 +289,7 @@ async function auditStaticProject(targetPath) {
     ],
     summary: {
       passed,
-      statusBadge: passed ? (sastReport.warningsCount > 0 ? 'APROBADO CON OBSERVACIONES' : 'APROBADO PARA ENTREGA') : 'REQUIERE REVISIÓN',
+      statusBadge: passed ? (sastReport.warningsCount > 0 ? 'APPROVED WITH OBSERVATIONS' : 'APPROVED FOR DELIVERY') : 'REQUIRES REVISION',
       totalBlockers: sastReport.blockersCount,
       totalWarnings: sastReport.warningsCount,
       totalVulnerabilities: 0
@@ -294,7 +299,7 @@ async function auditStaticProject(targetPath) {
 }
 
 async function auditNodeProject(targetPath) {
-  console.log('⚡ Ejecutando escaneo para Node.js...');
+  console.log('[INFO] Running scan for Node.js...');
 
   const [auditRaw, sastReport] = await Promise.all([
     runSafeCommand('npm', ['audit', '--json'], targetPath),
@@ -305,7 +310,7 @@ async function auditNodeProject(targetPath) {
   try {
     if (auditRaw.stdout) auditData = JSON.parse(auditRaw.stdout);
   } catch (e) {
-    console.warn('⚠️ No se pudo parsear salida de npm audit.');
+    console.warn('[WARN] Could not parse npm audit output.');
   }
 
   const detailedVulns = [];
@@ -314,14 +319,14 @@ async function auditNodeProject(targetPath) {
   for (const [pkgName, details] of Object.entries(rawVulns)) {
     const isCritical = details.severity === 'critical' || details.severity === 'high';
     const fixText = details.fixAvailable === true 
-      ? 'Actualización directa disponible vía npm audit fix' 
+      ? 'Direct update available via npm audit fix' 
       : (typeof details.fixAvailable === 'object' 
-          ? `Requiere actualizar a ${details.fixAvailable.name}@${details.fixAvailable.version} (breaking change)` 
-          : 'Sin parche automático publicado aún');
+          ? `Requires updating to ${details.fixAvailable.name}@${details.fixAvailable.version} (breaking change)` 
+          : 'No automated patch released yet');
 
     detailedVulns.push({
       type: 'dependency',
-      category: isCritical ? 'Bloqueante' : 'Advertencia',
+      category: isCritical ? 'Blocker' : 'Warning',
       severity: details.severity.toUpperCase(),
       ruleId: `npm-${pkgName}`,
       path: `package.json -> ${pkgName}`,
@@ -329,7 +334,7 @@ async function auditNodeProject(targetPath) {
       name: pkgName,
       range: details.range || 'N/A',
       fix: fixText,
-      message: `Paquete vulnerable "${pkgName}". Severidad: ${details.severity}. Corrección: ${fixText}`
+      message: `Vulnerable dependency "${pkgName}". Severity: ${details.severity}. Fix: ${fixText}`
     });
   }
 
@@ -352,7 +357,7 @@ async function auditNodeProject(targetPath) {
     ],
     summary: {
       passed,
-      statusBadge: passed ? (sastReport.warningsCount > 0 ? 'APROBADO CON OBSERVACIONES' : 'APROBADO PARA ENTREGA') : 'REQUIERE REVISIÓN',
+      statusBadge: passed ? (sastReport.warningsCount > 0 ? 'APPROVED WITH OBSERVATIONS' : 'APPROVED FOR DELIVERY') : 'REQUIRES REVISION',
       totalBlockers,
       totalWarnings: sastReport.warningsCount + (vulns.moderate || 0) + (vulns.low || 0),
       totalVulnerabilities: vulns.total || 0,
@@ -365,7 +370,7 @@ async function auditNodeProject(targetPath) {
 }
 
 async function auditPhpProject(targetPath) {
-  console.log('⚡ Ejecutando escaneo para PHP/Composer...');
+  console.log('[INFO] Running scan for PHP/Composer...');
 
   const [auditRaw, sastReport] = await Promise.all([
     runSafeCommand('composer', ['audit', '--no-plugins', '--no-scripts', '--format=json'], targetPath),
@@ -376,7 +381,7 @@ async function auditPhpProject(targetPath) {
   try {
     if (auditRaw.stdout) auditData = JSON.parse(auditRaw.stdout);
   } catch (e) {
-    console.warn('⚠️ No se pudo parsear salida de composer audit.');
+    console.warn('[WARN] Could not parse composer audit output.');
   }
 
   const advisoriesCount = Object.keys(auditData.advisories || {}).length;
@@ -394,7 +399,7 @@ async function auditPhpProject(targetPath) {
     ],
     summary: {
       passed,
-      statusBadge: passed ? (sastReport.warningsCount > 0 ? 'APROBADO CON OBSERVACIONES' : 'APROBADO PARA ENTREGA') : 'REQUIERE REVISIÓN',
+      statusBadge: passed ? (sastReport.warningsCount > 0 ? 'APPROVED WITH OBSERVATIONS' : 'APPROVED FOR DELIVERY') : 'REQUIRES REVISION',
       totalBlockers,
       totalWarnings: sastReport.warningsCount,
       totalAdvisories: advisoriesCount
@@ -406,15 +411,14 @@ async function auditPhpProject(targetPath) {
 
 const VALID_ENVIRONMENTS = ['node', 'php', 'static_web'];
 
-// Orquestador principal (100% Local)
+// Main orchestrator (100% Local)
 async function scanProject(targetInput, projectType = null) {
   if (!projectType || !VALID_ENVIRONMENTS.includes(projectType)) {
-    throw new Error(`Debes seleccionar un entorno válido (${VALID_ENVIRONMENTS.join(', ')}). Recibido: "${projectType}"`);
+    throw new Error(`You must select a valid environment (${VALID_ENVIRONMENTS.join(', ')}). Received: "${projectType}"`);
   }
 
   const inputStr = targetInput ? targetInput.trim() : './';
   
-  // Detecta URLs remotas Git (HTTPS o SSH)
   const isGit = /^(https?:\/\/|git@).+/i.test(inputStr);
   const isZip = inputStr.toLowerCase().endsWith('.zip');
 
@@ -423,7 +427,6 @@ async function scanProject(targetInput, projectType = null) {
 
   try {
     if (isGit) {
-      // Clona usando el cliente Git y credenciales locales del usuario
       workingDir = await cloneRepoLocal(inputStr);
       isTempDir = true;
     } else if (isZip) {
@@ -434,10 +437,10 @@ async function scanProject(targetInput, projectType = null) {
     const absolutePath = path.resolve(workingDir);
 
     if (!fs.existsSync(absolutePath)) {
-      throw new Error(`El directorio de trabajo "${absolutePath}" no existe.`);
+      throw new Error(`Working directory "${absolutePath}" does not exist.`);
     }
 
-    console.log(`🔍 Iniciando análisis en: ${isGit ? inputStr : absolutePath} (Entorno: ${projectType})`);
+    console.log(`[INFO] Starting audit on: ${isGit ? inputStr : absolutePath} (Environment: ${projectType})`);
 
     let report = null;
     if (projectType === 'php') {
@@ -455,13 +458,13 @@ async function scanProject(targetInput, projectType = null) {
     const outputPath = path.join(process.cwd(), 'scan-report.json');
     fs.writeFileSync(outputPath, JSON.stringify(report, null, 2));
 
-    console.log('\n✅ Análisis completado con éxito.');
-    console.log(`📄 Reporte guardado en: ${outputPath}\n`);
+    console.log('[SUCCESS] Audit completed successfully.');
+    console.log(`[INFO] Report saved to: ${outputPath}`);
 
     return report;
 
   } catch (error) {
-    console.error(`❌ Error durante el escaneo: ${error.message}`);
+    console.error(`[ERROR] Scan execution failed: ${error.message}`);
     throw error;
   } finally {
     if (isTempDir && workingDir) {
@@ -470,14 +473,14 @@ async function scanProject(targetInput, projectType = null) {
   }
 }
 
-// Ejecución directa CLI: node Orchestrator.js <path|git-url|zip> <node|php|static_web>
+// CLI execution: node Orchestrator.js <path|git-url|zip> <node|php|static_web>
 if (require.main === module) {
   const targetPath = process.argv[2] || './';
   const forcedType = process.argv[3] || null;
 
   if (!forcedType || !VALID_ENVIRONMENTS.includes(forcedType)) {
-    console.error(`❌ Debes especificar un entorno válido: ${VALID_ENVIRONMENTS.join(' | ')}`);
-    console.error('Ejemplo: node Orchestrator.js ./mi-proyecto node');
+    console.error(`[ERROR] You must specify a valid environment: ${VALID_ENVIRONMENTS.join(' | ')}`);
+    console.error('Example: node Orchestrator.js ./my-project node');
     process.exit(1);
   }
 

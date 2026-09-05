@@ -7,7 +7,7 @@ const { scanProject } = require('./Orchestrator.js');
 
 const app = express();
 
-// Límite de seguridad para carga de ZIPs en local (ej. 50 MB)
+// Security limit for local ZIP uploads (50 MB)
 const upload = multer({
   dest: os.tmpdir(),
   limits: { fileSize: 50 * 1024 * 1024 }
@@ -15,28 +15,28 @@ const upload = multer({
 
 const VALID_ENVIRONMENTS = ['node', 'php', 'static_web'];
 
-// Middlewares base
+// Base middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 1. Auditar carpeta local existente en el disco del usuario
+// 1. Audit an existing local directory on the user's filesystem
 app.post('/api/audit/folder', async (req, res) => {
   const { folderPath, projectType } = req.body;
 
   if (!folderPath || typeof folderPath !== 'string') {
-    return res.status(400).json({ error: 'La ruta de la carpeta es obligatoria.' });
+    return res.status(400).json({ error: 'Folder path is required.' });
   }
 
   if (!projectType || !VALID_ENVIRONMENTS.includes(projectType)) {
     return res.status(400).json({
-      error: `Debes seleccionar un tipo de proyecto válido: ${VALID_ENVIRONMENTS.join(', ')}`
+      error: `You must select a valid project type: ${VALID_ENVIRONMENTS.join(', ')}`
     });
   }
 
   const resolvedPath = path.resolve(folderPath.trim());
   if (!fs.existsSync(resolvedPath)) {
-    return res.status(400).json({ error: `La ruta "${resolvedPath}" no existe en este equipo.` });
+    return res.status(400).json({ error: `The path "${resolvedPath}" does not exist on this machine.` });
   }
 
   try {
@@ -47,29 +47,7 @@ app.post('/api/audit/folder', async (req, res) => {
   }
 });
 
-// 2. Auditar repositorio remoto vía Git local (HTTPS o SSH)
-app.post('/api/audit/git', async (req, res) => {
-  const { repoUrl, projectType } = req.body;
-
-  if (!repoUrl || typeof repoUrl !== 'string') {
-    return res.status(400).json({ error: 'La URL o ruta del repositorio es obligatoria.' });
-  }
-
-  if (!projectType || !VALID_ENVIRONMENTS.includes(projectType)) {
-    return res.status(400).json({
-      error: `Debes seleccionar un tipo de proyecto válido: ${VALID_ENVIRONMENTS.join(', ')}`
-    });
-  }
-
-  try {
-    const reportData = await scanProject(repoUrl.trim(), projectType);
-    res.json({ success: true, data: reportData });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 3. Auditar archivo ZIP
+// 2. Audit a local ZIP archive
 app.post('/api/audit/zip', upload.single('projectZip'), async (req, res) => {
   const { projectType } = req.body;
 
@@ -78,12 +56,12 @@ app.post('/api/audit/zip', upload.single('projectZip'), async (req, res) => {
       fs.unlinkSync(req.file.path);
     }
     return res.status(400).json({
-      error: `Debes seleccionar un tipo de proyecto válido: ${VALID_ENVIRONMENTS.join(', ')}`
+      error: `You must select a valid project type: ${VALID_ENVIRONMENTS.join(', ')}`
     });
   }
 
   if (!req.file) {
-    return res.status(400).json({ error: 'Debes seleccionar un archivo .zip para auditar.' });
+    return res.status(400).json({ error: 'Please select a .zip file to audit.' });
   }
 
   const zipTempPath = `${req.file.path}.zip`;
@@ -101,11 +79,11 @@ app.post('/api/audit/zip', upload.single('projectZip'), async (req, res) => {
   }
 });
 
-// Permite ejecutar directo o importar desde el binario CLI
+// Allows direct execution or CLI binary import
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`🚀 Auditor Web UI activo en http://localhost:${PORT}`);
+    console.log(`[INFO] Auditor Web UI active on http://localhost:${PORT}`);
   });
 }
 

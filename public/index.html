@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auditor Engine - Análisis Local</title>
+  <title>Auditor Engine - Local Analysis</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
@@ -12,124 +12,133 @@
     <!-- Header -->
     <div class="text-center mb-8">
       <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 mb-3">
-        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        Motor Local-First • Tu código nunca sale de tu equipo
       </div>
-      <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Auditoría Pre-Entrega de Código</h1>
-      <p class="mt-2 text-base text-slate-600">Inspecciona SAST (Semgrep), dependencias vulnerables y credenciales expuestas al instante.</p>
+      <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Pre-Delivery Code Audit</h1>
+      <p class="mt-2 text-base text-slate-600">Inspect SAST (Semgrep), vulnerable dependencies, and leaked credentials in seconds.</p>
     </div>
 
-    <!-- Contenedor Principal -->
+    <!-- Inline Error Notification Banner -->
+    <div id="errorBanner" class="hidden mb-6 p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-start justify-between shadow-sm">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span id="errorMessage" class="font-medium"></span>
+      </div>
+      <button type="button" onclick="dismissError()" class="text-rose-500 hover:text-rose-700 ml-4 font-bold text-lg leading-none cursor-pointer">&times;</button>
+    </div>
+
+    <!-- Main Container -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-6">
       <form id="auditForm" onsubmit="handleAuditSubmit(event)" class="space-y-4">
         
-        <!-- Selección de Origen -->
+        <!-- Source Selection -->
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Origen del proyecto:</label>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Project source:</label>
           <div class="grid grid-cols-2 gap-3">
             <label class="flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-indigo-600 bg-indigo-50/40 text-indigo-700" id="labelModeFolder">
               <input type="radio" name="sourceMode" value="folder" checked onchange="switchSourceMode('folder')" class="hidden">
-              📁 Carpeta Local
+               Local Directory
             </label>
             <label class="flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-slate-200 text-slate-600 hover:bg-slate-50" id="labelModeZip">
               <input type="radio" name="sourceMode" value="zip" onchange="switchSourceMode('zip')" class="hidden">
-              📦 Archivo .ZIP
+               .ZIP Archive
             </label>
           </div>
         </div>
 
-        <!-- Input 1: Carpeta local -->
+        <!-- Input 1: Local Directory -->
         <div id="fieldFolder">
-          <label class="block text-sm font-medium text-slate-700 mb-1">Ruta absoluta del proyecto en disco:</label>
-          <input type="text" id="folderPath" placeholder="/home/usuario/proyectos/mi-app  o  C:\Proyectos\mi-app" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-          <p class="text-[11px] text-slate-500 mt-1">Escanea directamente en tu disco sin duplicar archivos ni consumir red.</p>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Absolute project path on disk:</label>
+          <input type="text" id="folderPath" placeholder="/home/user/projects/my-app  or  C:\Projects\my-app" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          <p class="text-[11px] text-slate-500 mt-1">Scans directly on your filesystem without duplicating files or using network bandwidth.</p>
         </div>
 
-        <!-- Input 2: Archivo ZIP -->
+        <!-- Input 2: ZIP File -->
         <div id="fieldZip" class="hidden">
-          <label class="block text-sm font-medium text-slate-700 mb-1">Seleccionar archivo .zip:</label>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Select .zip file:</label>
           <input type="file" id="zipFile" accept=".zip" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-slate-300 rounded-lg cursor-pointer">
         </div>
 
-        <!-- Selector de Entorno -->
+        <!-- Environment Selector -->
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Entorno del proyecto:</label>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Project environment:</label>
           <select id="projectType" class="w-full bg-white border border-slate-300 text-slate-800 text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
             <option value="node">Node.js / Express / React / Next.js / Vue</option>
             <option value="php">PHP / Laravel / Composer</option>
-            <option value="static_web">Web Estático (HTML / CSS / JavaScript)</option>
+            <option value="static_web">Static Web (HTML / CSS / JavaScript)</option>
           </select>
         </div>
 
         <button type="submit" id="btnSubmit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg transition shadow-sm cursor-pointer">
-          Iniciar Auditoría
+          Run Security Audit
         </button>
       </form>
     </div>
 
-    <!-- Spinner de Carga -->
+    <!-- Loading Spinner -->
     <div id="loading" class="hidden text-center py-10">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-r-transparent"></div>
-      <p class="mt-3 text-sm font-medium text-slate-700">Ejecutando análisis estático y comprobación de seguridad...</p>
-      <p class="text-xs text-slate-500 mt-1">Procesando localmente mediante Semgrep y detectores de dependencias.</p>
+      <p class="mt-3 text-sm font-medium text-slate-700">Running static analysis and security checks...</p>
+      <p class="text-xs text-slate-500 mt-1">Processing locally using Semgrep and package dependency scanners.</p>
     </div>
 
-    <!-- Contenedor de Resultados -->
+    <!-- Results Container -->
     <div id="resultContainer" class="hidden mt-8 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
         <div>
-          <h2 class="text-lg font-bold text-slate-800">Resultado de la Auditoría</h2>
+          <h2 class="text-lg font-bold text-slate-800">Audit Summary</h2>
           <p id="resProjectMeta" class="text-xs text-slate-500"></p>
         </div>
         <span id="resBadge" class="px-3 py-1 text-xs font-bold rounded-full uppercase"></span>
       </div>
 
-      <!-- Métricas -->
+      <!-- Metrics -->
       <div class="grid grid-cols-2 gap-4 mb-6">
         <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 cursor-pointer hover:border-rose-300 transition" onclick="setFilter('blockers')">
-          <div class="text-xs text-slate-500 font-medium">Bloqueantes Críticos</div>
+          <div class="text-xs text-slate-500 font-medium">Critical Blockers</div>
           <div id="resBlockers" class="text-2xl font-bold mt-1">0</div>
         </div>
         <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 cursor-pointer hover:border-amber-300 transition" onclick="setFilter('warnings')">
-          <div class="text-xs text-slate-500 font-medium">Advertencias</div>
+          <div class="text-xs text-slate-500 font-medium">Warnings / Observations</div>
           <div id="resWarnings" class="text-2xl font-bold mt-1">0</div>
         </div>
       </div>
 
-      <!-- Barra de Filtros y Control de Paginación -->
+      <!-- Filter Controls & Pagination Overview -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 border-b border-slate-100 pb-3">
         <div class="flex items-center gap-1.5">
-          <span class="text-xs font-semibold text-slate-500 mr-1">Filtrar:</span>
-          <button id="filterBtnAll" onclick="setFilter('all')" class="px-2.5 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">Todos (<span id="countAll">0</span>)</button>
-          <button id="filterBtnBlockers" onclick="setFilter('blockers')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent">Bloqueantes (<span id="countBlockers">0</span>)</button>
-          <button id="filterBtnWarnings" onclick="setFilter('warnings')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent">Advertencias (<span id="countWarnings">0</span>)</button>
+          <span class="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
+          <button id="filterBtnAll" onclick="setFilter('all')" class="px-2.5 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">All (<span id="countAll">0</span>)</button>
+          <button id="filterBtnBlockers" onclick="setFilter('blockers')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent">Blockers (<span id="countBlockers">0</span>)</button>
+          <button id="filterBtnWarnings" onclick="setFilter('warnings')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent">Warnings (<span id="countWarnings">0</span>)</button>
         </div>
-        <div class="text-xs text-slate-500" id="paginationInfo">Mostrando 0 - 0 de 0</div>
+        <div class="text-xs text-slate-500" id="paginationInfo">Showing 0 - 0 of 0</div>
       </div>
 
-      <!-- Tabla de Hallazgos -->
+      <!-- Findings Table -->
       <div>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs border-collapse">
             <thead>
               <tr class="bg-slate-50 border-b border-slate-200 text-slate-600">
-                <th class="p-2 w-1/4">Ubicación</th>
-                <th class="p-2">Descripción</th>
-                <th class="p-2 text-right w-24">Severidad</th>
+                <th class="p-2 w-1/4">Location</th>
+                <th class="p-2">Description & Remediation</th>
+                <th class="p-2 text-right w-24">Severity</th>
               </tr>
             </thead>
             <tbody id="findingsTableBody"></tbody>
           </table>
         </div>
 
-        <!-- Controles de Paginación -->
+        <!-- Pagination Controls -->
         <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
           <button id="btnPrevPage" onclick="changePage(-1)" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
-            &larr; Anterior
+            &larr; Previous
           </button>
-          <div id="pageIndicator" class="text-xs font-medium text-slate-600">Página 1 de 1</div>
+          <div id="pageIndicator" class="text-xs font-medium text-slate-600">Page 1 of 1</div>
           <button id="btnNextPage" onclick="changePage(1)" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
-            Siguiente &rarr;
+            Next &rarr;
           </button>
         </div>
       </div>
@@ -143,7 +152,19 @@
     let currentPage = 1;
     const itemsPerPage = 10;
 
+    function showError(message) {
+      const banner = document.getElementById('errorBanner');
+      const text = document.getElementById('errorMessage');
+      text.innerText = message;
+      banner.classList.remove('hidden');
+    }
+
+    function dismissError() {
+      document.getElementById('errorBanner').classList.add('hidden');
+    }
+
     function switchSourceMode(mode) {
+      dismissError();
       currentSourceMode = mode;
 
       const modes = ['folder', 'zip'];
@@ -167,6 +188,7 @@
 
     async function handleAuditSubmit(e) {
       e.preventDefault();
+      dismissError();
       const projectType = document.getElementById('projectType').value;
 
       let endpoint = '';
@@ -175,7 +197,7 @@
       if (currentSourceMode === 'folder') {
         const folderPath = document.getElementById('folderPath').value.trim();
         if (!folderPath) {
-          alert('Por favor ingresa la ruta de la carpeta local.');
+          showError('Please enter a valid local directory path.');
           return;
         }
         endpoint = '/api/audit/folder';
@@ -187,7 +209,7 @@
       } else if (currentSourceMode === 'zip') {
         const fileInput = document.getElementById('zipFile');
         if (!fileInput.files[0]) {
-          alert('Por favor selecciona un archivo .zip.');
+          showError('Please select a valid .zip file to scan.');
           return;
         }
         const formData = new FormData();
@@ -202,10 +224,10 @@
       try {
         const res = await fetch(endpoint, options);
         const json = await res.json();
-        if (!res.ok || json.error) throw new Error(json.error || 'Error al procesar la auditoría');
+        if (!res.ok || json.error) throw new Error(json.error || 'Failed to complete code audit.');
         renderResults(json.data);
       } catch (err) {
-        alert(`Error: ${err.message}`);
+        showError(err.message || 'An unexpected error occurred during execution.');
       } finally {
         setLoading(false);
       }
@@ -217,15 +239,19 @@
 
     function renderResults(data) {
       document.getElementById('resultContainer').classList.remove('hidden');
-      document.getElementById('resProjectMeta').innerText = `Entorno: ${data.projectType} • Origen: ${data.source?.target || 'Local'} • ${new Date(data.scannedAt).toLocaleTimeString()}`;
+      document.getElementById('resProjectMeta').innerText = `Environment: ${data.projectType} • Target: ${data.source?.target || 'Local'} • ${new Date(data.scannedAt).toLocaleTimeString()}`;
 
       const badge = document.getElementById('resBadge');
-      badge.innerText = data.summary.statusBadge;
-      if (data.summary.passed) {
-        badge.className = data.summary.totalWarnings > 0 
+      const isPassed = data.summary.passed;
+      const hasWarnings = data.summary.totalWarnings > 0;
+
+      if (isPassed) {
+        badge.innerText = hasWarnings ? 'APPROVED WITH OBSERVATIONS' : 'APPROVED FOR DELIVERY';
+        badge.className = hasWarnings 
           ? 'px-3 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-700' 
           : 'px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700';
       } else {
+        badge.innerText = 'REQUIRES REVISION';
         badge.className = 'px-3 py-1 text-xs font-bold rounded-full bg-rose-100 text-rose-700';
       }
 
@@ -305,7 +331,7 @@
         tbody.innerHTML = `
           <tr>
             <td colspan="3" class="p-6 text-center text-slate-400">
-              No se detectaron observaciones en este nivel.
+              No findings detected in this view.
             </td>
           </tr>
         `;
@@ -319,11 +345,11 @@
           tr.innerHTML = `
             <td class="p-2 font-mono text-slate-800 align-top">
               <div class="font-semibold break-all">${item.path}:${item.startLine || '1'}</div>
-              ${isDependency ? '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-sky-100 text-sky-700 font-bold mt-1">Librería</span>' : ''}
+              ${isDependency ? '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-sky-100 text-sky-700 font-bold mt-1">Package Advisory</span>' : ''}
             </td>
             <td class="p-2 text-slate-600 align-top">
               <div>${item.message}</div>
-              ${item.fix ? `<div class="text-[11px] text-slate-500 mt-1"><strong>Solución:</strong> ${item.fix}</div>` : ''}
+              ${item.fix ? `<div class="text-[11px] text-slate-500 mt-1"><strong>Fix:</strong> ${item.fix}</div>` : ''}
               ${item.cwe || item.owasp ? `<div class="text-[10px] text-slate-400 mt-0.5">${[item.cwe, item.owasp].filter(Boolean).join(' • ')}</div>` : ''}
             </td>
             <td class="p-2 text-right align-top">
@@ -338,8 +364,8 @@
 
       const displayStart = totalItems === 0 ? 0 : startIndex + 1;
       const displayEnd = Math.min(startIndex + itemsPerPage, totalItems);
-      document.getElementById('paginationInfo').innerText = `Mostrando ${displayStart} - ${displayEnd} de ${totalItems}`;
-      document.getElementById('pageIndicator').innerText = `Página ${currentPage} de ${maxPages}`;
+      document.getElementById('paginationInfo').innerText = `Showing ${displayStart} - ${displayEnd} of ${totalItems}`;
+      document.getElementById('pageIndicator').innerText = `Page ${currentPage} of ${maxPages}`;
       
       document.getElementById('btnPrevPage').disabled = currentPage <= 1;
       document.getElementById('btnNextPage').disabled = currentPage >= maxPages;
