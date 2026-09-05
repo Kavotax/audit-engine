@@ -3,82 +3,80 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auditor Engine - Certificado de Entrega</title>
+  <title>Auditor Engine - Análisis Local</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
 
   <div class="max-w-4xl mx-auto py-12 px-4">
     <!-- Header -->
-    <div class="text-center mb-10">
-      <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Certificado de Auditoría Pre-Entrega</h1>
-      <p class="mt-2 text-base text-slate-600">Audita la seguridad, dependencias y credenciales de tu software en segundos.</p>
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 mb-3">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        Motor Local-First • Tu código nunca sale de tu equipo
+      </div>
+      <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Auditoría Pre-Entrega de Código</h1>
+      <p class="mt-2 text-base text-slate-600">Inspecciona SAST (Semgrep), dependencias vulnerables y credenciales expuestas al instante.</p>
     </div>
 
     <!-- Contenedor Principal -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <!-- Tabs -->
-      <div class="flex border-b border-slate-200 bg-slate-50/50">
-        <button id="tabZip" onclick="switchTab('zip')" class="flex-1 py-3 px-4 text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600">Subir Archivo .ZIP</button>
-        <button id="tabGit" onclick="switchTab('git')" class="flex-1 py-3 px-4 text-sm font-semibold text-slate-500 hover:text-slate-700">Repositorio GitHub</button>
-      </div>
-
-      <div class="p-6">
-        <!-- Formulario ZIP -->
-        <form id="formZip" onsubmit="submitZip(event)" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Proyecto comprimido (.zip)</label>
-            <input type="file" id="zipFile" accept=".zip" required class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-slate-300 rounded-md cursor-pointer">
-          </div>
-          <button type="submit" id="btnSubmitZip" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-md transition shadow-sm cursor-pointer">Iniciar Auditoría</button>
-        </form>
-
-        <!-- Pestaña GitHub con OAuth -->
-        <div id="formGit" class="space-y-4 hidden">
-          <div id="gitLoggedOut" class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50/50 space-y-4">
-            <div class="mx-auto w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-sm">
-              <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-            </div>
-            <div>
-              <h3 class="text-sm font-bold text-slate-800">Conecta tu cuenta de GitHub</h3>
-              <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Autoriza la aplicación para seleccionar tus repositorios con un solo clic.</p>
-            </div>
-            <button type="button" onclick="loginWithGitHubPopup()" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-2.5 px-5 rounded-lg transition shadow-sm cursor-pointer">
-              <span>Conectar con GitHub</span>
-            </button>
-          </div>
-
-          <div id="gitLoggedIn" class="hidden space-y-4">
-            <div class="flex justify-between items-center bg-emerald-50 border border-emerald-200 px-4 py-2.5 rounded-lg text-emerald-800 text-xs font-medium">
-              <span class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span id="githubUserLabel">GitHub Conectado</span>
-              </span>
-              <button type="button" onclick="logoutGitHub()" class="text-emerald-700 underline hover:text-emerald-900 cursor-pointer">Cerrar sesión</button>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Selecciona el repositorio a auditar:</label>
-              <select id="repoSelect" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"></select>
-            </div>
-
-            <button type="button" onclick="submitSelectGit()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-md transition shadow-sm cursor-pointer">
-              Clonar y Auditar Repositorio
-            </button>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-6">
+      <form id="auditForm" onsubmit="handleAuditSubmit(event)" class="space-y-4">
+        
+        <!-- Selección de Origen -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Origen del proyecto:</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-indigo-600 bg-indigo-50/40 text-indigo-700" id="labelModeFolder">
+              <input type="radio" name="sourceMode" value="folder" checked onchange="switchSourceMode('folder')" class="hidden">
+              📁 Carpeta Local
+            </label>
+            <label class="flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-slate-200 text-slate-600 hover:bg-slate-50" id="labelModeZip">
+              <input type="radio" name="sourceMode" value="zip" onchange="switchSourceMode('zip')" class="hidden">
+              📦 Archivo .ZIP
+            </label>
           </div>
         </div>
-      </div>
+
+        <!-- Input 1: Carpeta local -->
+        <div id="fieldFolder">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Ruta absoluta del proyecto en disco:</label>
+          <input type="text" id="folderPath" placeholder="/home/usuario/proyectos/mi-app  o  C:\Proyectos\mi-app" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          <p class="text-[11px] text-slate-500 mt-1">Escanea directamente en tu disco sin duplicar archivos ni consumir red.</p>
+        </div>
+
+        <!-- Input 2: Archivo ZIP -->
+        <div id="fieldZip" class="hidden">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Seleccionar archivo .zip:</label>
+          <input type="file" id="zipFile" accept=".zip" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-slate-300 rounded-lg cursor-pointer">
+        </div>
+
+        <!-- Selector de Entorno -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Entorno del proyecto:</label>
+          <select id="projectType" class="w-full bg-white border border-slate-300 text-slate-800 text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="node">Node.js / Express / React / Next.js / Vue</option>
+            <option value="php">PHP / Laravel / Composer</option>
+            <option value="static_web">Web Estático (HTML / CSS / JavaScript)</option>
+          </select>
+        </div>
+
+        <button type="submit" id="btnSubmit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg transition shadow-sm cursor-pointer">
+          Iniciar Auditoría
+        </button>
+      </form>
     </div>
 
     <!-- Spinner de Carga -->
     <div id="loading" class="hidden text-center py-10">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-r-transparent"></div>
-      <p class="mt-3 text-sm text-slate-600">Ejecutando análisis estático, detección de secretos y licencias...</p>
+      <p class="mt-3 text-sm font-medium text-slate-700">Ejecutando análisis estático y comprobación de seguridad...</p>
+      <p class="text-xs text-slate-500 mt-1">Procesando localmente mediante Semgrep y detectores de dependencias.</p>
     </div>
 
-    <!-- Resultados en Vivo -->
+    <!-- Contenedor de Resultados -->
     <div id="resultContainer" class="hidden mt-8 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-      <div class="flex items-center justify-between border-b pb-4 mb-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
         <div>
           <h2 class="text-lg font-bold text-slate-800">Resultado de la Auditoría</h2>
           <p id="resProjectMeta" class="text-xs text-slate-500"></p>
@@ -87,18 +85,14 @@
       </div>
 
       <!-- Métricas -->
-      <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-2 gap-4 mb-6">
         <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 cursor-pointer hover:border-rose-300 transition" onclick="setFilter('blockers')">
-          <div class="text-xs text-slate-500 font-medium">Bloqueantes</div>
-          <div id="resBlockers" class="text-xl font-bold mt-1">0</div>
+          <div class="text-xs text-slate-500 font-medium">Bloqueantes Críticos</div>
+          <div id="resBlockers" class="text-2xl font-bold mt-1">0</div>
         </div>
         <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 cursor-pointer hover:border-amber-300 transition" onclick="setFilter('warnings')">
           <div class="text-xs text-slate-500 font-medium">Advertencias</div>
-          <div id="resWarnings" class="text-xl font-bold mt-1">0</div>
-        </div>
-        <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200">
-          <div class="text-xs text-slate-500 font-medium">Problemas con Licencias</div>
-          <div id="resLicenses" class="text-xl font-bold mt-1">0</div>
+          <div id="resWarnings" class="text-2xl font-bold mt-1">0</div>
         </div>
       </div>
 
@@ -143,117 +137,75 @@
   </div>
 
   <script>
-    // Variables de Estado de Visualización
+    let currentSourceMode = 'folder';
     let allReportItems = [];
     let currentFilter = 'all';
     let currentPage = 1;
     const itemsPerPage = 10;
 
-    function switchTab(tab) {
-      const isZip = tab === 'zip';
-      document.getElementById('formZip').classList.toggle('hidden', !isZip);
-      document.getElementById('formGit').classList.toggle('hidden', isZip);
-      document.getElementById('tabZip').className = isZip ? 'flex-1 py-3 px-4 text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600' : 'flex-1 py-3 px-4 text-sm font-semibold text-slate-500 hover:text-slate-700';
-      document.getElementById('tabGit').className = !isZip ? 'flex-1 py-3 px-4 text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600' : 'flex-1 py-3 px-4 text-sm font-semibold text-slate-500 hover:text-slate-700';
+    function switchSourceMode(mode) {
+      currentSourceMode = mode;
+
+      const modes = ['folder', 'zip'];
+      modes.forEach(m => {
+        const inputDiv = document.getElementById(`field${m.charAt(0).toUpperCase() + m.slice(1)}`);
+        const label = document.getElementById(`labelMode${m.charAt(0).toUpperCase() + m.slice(1)}`);
+        const isSelected = m === mode;
+
+        inputDiv.classList.toggle('hidden', !isSelected);
+        label.className = isSelected
+          ? 'flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-indigo-600 bg-indigo-50/40 text-indigo-700'
+          : 'flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-slate-200 text-slate-600 hover:bg-slate-50';
+      });
     }
 
     function setLoading(isLoading) {
       document.getElementById('loading').classList.toggle('hidden', !isLoading);
       document.getElementById('resultContainer').classList.toggle('hidden', isLoading);
+      document.getElementById('btnSubmit').disabled = isLoading;
     }
 
-    function loginWithGitHubPopup() {
-      const width = 600;
-      const height = 700;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
+    async function handleAuditSubmit(e) {
+      e.preventDefault();
+      const projectType = document.getElementById('projectType').value;
 
-      const popup = window.open(
-        '/api/auth/github',
-        'github_oauth',
-        `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`
-      );
+      let endpoint = '';
+      let options = {};
 
-      window.addEventListener('message', function onAuthMessage(event) {
-        if (event.data === 'github_auth_success') {
-          window.removeEventListener('message', onAuthMessage);
-          if (popup) popup.close();
-          checkGitHubAuth();
+      if (currentSourceMode === 'folder') {
+        const folderPath = document.getElementById('folderPath').value.trim();
+        if (!folderPath) {
+          alert('Por favor ingresa la ruta de la carpeta local.');
+          return;
         }
-      });
-    }
-
-    async function checkGitHubAuth() {
-      try {
-        const res = await fetch('/api/github/user-repos');
-        if (!res.ok) return;
-
-        const data = await res.json();
-        const loggedOutDiv = document.getElementById('gitLoggedOut');
-        const loggedInDiv = document.getElementById('gitLoggedIn');
-        const select = document.getElementById('repoSelect');
-
-        if (data.authenticated) {
-          loggedOutDiv.classList.add('hidden');
-          loggedInDiv.classList.remove('hidden');
-          document.getElementById('githubUserLabel').innerText = `Conectado como @${data.username}`;
-
-          select.innerHTML = data.repos.map(r => `
-            <option value="${r.clone_url}">
-              ${r.name} ${r.private ? '🔒 (Privado)' : '🌐 (Público)'}
-            </option>
-          `).join('');
-        } else {
-          loggedOutDiv.classList.remove('hidden');
-          loggedInDiv.classList.add('hidden');
+        endpoint = '/api/audit/folder';
+        options = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderPath, projectType })
+        };
+      } else if (currentSourceMode === 'zip') {
+        const fileInput = document.getElementById('zipFile');
+        if (!fileInput.files[0]) {
+          alert('Por favor selecciona un archivo .zip.');
+          return;
         }
-      } catch (err) {
-        console.error('Error al comprobar sesión GitHub:', err);
+        const formData = new FormData();
+        formData.append('projectZip', fileInput.files[0]);
+        formData.append('projectType', projectType);
+
+        endpoint = '/api/audit/zip';
+        options = { method: 'POST', body: formData };
       }
-    }
-
-    async function logoutGitHub() {
-      await fetch('/api/auth/github/logout');
-      checkGitHubAuth();
-    }
-
-    async function submitSelectGit() {
-      const url = document.getElementById('repoSelect').value;
-      if (!url) return;
 
       setLoading(true);
       try {
-        const res = await fetch('/api/audit/git', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repoUrl: url })
-        });
+        const res = await fetch(endpoint, options);
         const json = await res.json();
-        if (json.error) throw new Error(json.error);
+        if (!res.ok || json.error) throw new Error(json.error || 'Error al procesar la auditoría');
         renderResults(json.data);
       } catch (err) {
         alert(`Error: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    async function submitZip(e) {
-      e.preventDefault();
-      const fileInput = document.getElementById('zipFile');
-      if (!fileInput.files[0]) return;
-
-      const formData = new FormData();
-      formData.append('projectZip', fileInput.files[0]);
-
-      setLoading(true);
-      try {
-        const res = await fetch('/api/audit/zip', { method: 'POST', body: formData });
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
-        renderResults(json.data);
-      } catch (err) {
-        alert('Error al procesar auditoría.');
       } finally {
         setLoading(false);
       }
@@ -265,7 +217,7 @@
 
     function renderResults(data) {
       document.getElementById('resultContainer').classList.remove('hidden');
-      document.getElementById('resProjectMeta').innerText = `Entorno: ${data.projectType} | ${new Date(data.scannedAt).toLocaleString()}`;
+      document.getElementById('resProjectMeta').innerText = `Entorno: ${data.projectType} • Origen: ${data.source?.target || 'Local'} • ${new Date(data.scannedAt).toLocaleTimeString()}`;
 
       const badge = document.getElementById('resBadge');
       badge.innerText = data.summary.statusBadge;
@@ -279,13 +231,11 @@
 
       const blockers = document.getElementById('resBlockers');
       blockers.innerText = data.summary.totalBlockers;
-      blockers.className = `text-xl font-bold mt-1 ${data.summary.totalBlockers > 0 ? 'text-rose-600' : 'text-emerald-600'}`;
+      blockers.className = `text-2xl font-bold mt-1 ${data.summary.totalBlockers > 0 ? 'text-rose-600' : 'text-emerald-600'}`;
 
       const warnings = document.getElementById('resWarnings');
       warnings.innerText = data.summary.totalWarnings;
-      warnings.className = `text-xl font-bold mt-1 ${data.summary.totalWarnings > 0 ? 'text-amber-600' : 'text-emerald-600'}`;
-
-      document.getElementById('resLicenses').innerText = data.licenses?.hasRestrictedLicenses ? 'Detectadas' : '0';
+      warnings.className = `text-2xl font-bold mt-1 ${data.summary.totalWarnings > 0 ? 'text-amber-600' : 'text-emerald-600'}`;
 
       const codeItems = [
         ...(data.sast?.blockers || []),
@@ -294,7 +244,6 @@
       const depItems = data.dependenciesVulnerabilities || [];
       allReportItems = [...codeItems, ...depItems];
 
-      // Actualizar contadores de botones
       const countBlockers = allReportItems.filter(isItemCritical).length;
       const countWarnings = allReportItems.filter(item => !isItemCritical(item)).length;
       
@@ -356,7 +305,7 @@
         tbody.innerHTML = `
           <tr>
             <td colspan="3" class="p-6 text-center text-slate-400">
-              No hay elementos para mostrar en este filtro.
+              No se detectaron observaciones en este nivel.
             </td>
           </tr>
         `;
@@ -370,7 +319,7 @@
           tr.innerHTML = `
             <td class="p-2 font-mono text-slate-800 align-top">
               <div class="font-semibold break-all">${item.path}:${item.startLine || '1'}</div>
-              ${isDependency ? '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-sky-100 text-sky-700 font-bold mt-1">Librería NPM</span>' : ''}
+              ${isDependency ? '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-sky-100 text-sky-700 font-bold mt-1">Librería</span>' : ''}
             </td>
             <td class="p-2 text-slate-600 align-top">
               <div>${item.message}</div>
@@ -387,7 +336,6 @@
         });
       }
 
-      // Actualizar metadata de paginación
       const displayStart = totalItems === 0 ? 0 : startIndex + 1;
       const displayEnd = Math.min(startIndex + itemsPerPage, totalItems);
       document.getElementById('paginationInfo').innerText = `Mostrando ${displayStart} - ${displayEnd} de ${totalItems}`;
@@ -396,8 +344,6 @@
       document.getElementById('btnPrevPage').disabled = currentPage <= 1;
       document.getElementById('btnNextPage').disabled = currentPage >= maxPages;
     }
-
-    window.addEventListener('DOMContentLoaded', checkGitHubAuth);
   </script>
 </body>
 </html>

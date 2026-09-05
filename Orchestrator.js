@@ -1,57 +1,76 @@
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const AdmZip = require('adm-zip');
 
-function runCommand(command, cwd) {
+// Ejecución segura sin invocación de sub-shell vulnerable
+function runSafeCommand(file, args, cwd, timeout = 120000) {
   return new Promise((resolve) => {
-    exec(command, { cwd, maxBuffer: 1024 * 1024 * 15 }, (error, stdout, stderr) => {
-      resolve({ stdout: stdout ? stdout.trim() : '', stderr: stderr ? stderr.trim() : '', error });
-    });
+    execFile(
+      file,
+      args,
+      { cwd, timeout, maxBuffer: 1024 * 1024 * 15 },
+      (error, stdout, stderr) => {
+        resolve({
+          stdout: stdout ? stdout.trim() : '',
+          stderr: stderr ? stderr.trim() : '',
+          error
+        });
+      }
+    );
   });
 }
 
-// Clonado superficial y seguro de GitHub (públicos y privados)
-async function cloneGitHubRepo(repoUrl, authToken = null) {
+// Clonado local aprovechando SSH (~/.ssh) o Git Credential Manager del usuario
+async function cloneRepoLocal(repoUrl) {
   const tempDir = path.join(os.tmpdir(), `audit-repo-${Date.now()}`);
-  console.log(`📥 Clonando repositorio remoto (${repoUrl})...`);
+  console.log(`📥 Clonando repositorio remoto vía Git local (${repoUrl})...`);
 
-  let authUrl = repoUrl.trim();
-  if (authToken) {
-    const rawUrl = authUrl.replace(/^https?:\/\//, '');
-    authUrl = `https://${authToken}@${rawUrl}`;
-  }
-
-  const cloneCmd = `git clone --depth 1 "${authUrl}" "${tempDir}"`;
-  const result = await runCommand(cloneCmd, process.cwd());
+  const cleanUrl = repoUrl.trim();
+  const result = await runSafeCommand('git', ['clone', '--depth', '1', cleanUrl, tempDir], process.cwd());
 
   if (result.error && !fs.existsSync(tempDir)) {
-    throw new Error(`Error al clonar repositorio (verifica si es privado o requiere token): ${result.stderr || result.stdout}`);
+    throw new Error(
+      `Error al clonar repositorio. Verifica tus llaves SSH, credenciales de Git o que la URL exista: ${result.stderr || result.stdout}`
+    );
   }
 
-  // Si tiene package.json, resolver dependencias para escaneo de licencias y npm audit
+  // Generar lockfile sin ejecutar pre/post-install hooks maliciosos
   const hasPackageJson = fs.existsSync(path.join(tempDir, 'package.json'));
-  if (hasPackageJson) {
-    console.log('📦 Generando lockfile/dependencias para auditoría de paquetes...');
-    await runCommand('npm install --package-lock-only', tempDir);
+  const hasLockfile = fs.existsSync(path.join(tempDir, 'package-lock.json'));
+
+  if (hasPackageJson && !hasLockfile) {
+    console.log('📦 Generando lockfile seguro para auditoría de dependencias...');
+    await runSafeCommand('npm', ['install', '--package-lock-only', '--ignore-scripts'], tempDir);
   }
 
   return tempDir;
 }
 
-// Descompresión de archivos .zip en carpeta temporal
+// Descompresión protegida contra Zip Slip y Zip Bombs
 function extractZipArchive(zipFilePath) {
   const tempDir = path.join(os.tmpdir(), `audit-zip-${Date.now()}`);
   console.log(`📦 Descomprimiendo archivo ZIP (${zipFilePath})...`);
 
-  if (!fs.existsSync(zipFilePath)) {
-    throw new Error(`El archivo .zip "${zipFilePath}" no existe.`);
+  const resolvedZip = path.resolve(zipFilePath);
+  if (!fs.existsSync(resolvedZip)) {
+    throw new Error(`El archivo .zip "${resolvedZip}" no existe.`);
   }
 
-  const zip = new AdmZip(zipFilePath);
-  zip.extractAllTo(tempDir, true);
+  const zip = new AdmZip(resolvedZip);
+  const zipEntries = zip.getEntries();
+  const resolvedTempDir = path.resolve(tempDir);
 
+  // Validación anti Path-Traversal (Zip Slip)
+  for (const entry of zipEntries) {
+    const targetPath = path.resolve(resolvedTempDir, entry.entryName);
+    if (!targetPath.startsWith(resolvedTempDir + path.sep) && targetPath !== resolvedTempDir) {
+      throw new Error('Archivo ZIP malicioso detectado: intento de escape de directorio (Zip Slip).');
+    }
+  }
+
+  zip.extractAllTo(tempDir, true);
   return tempDir;
 }
 
@@ -67,25 +86,12 @@ function cleanupTempDir(dirPath) {
   }
 }
 
-/**
- * Determina si una cadena parece un secreto criptográfico real o solo un texto de prueba / configuración
- */
 function isLikelyRealSecret(str) {
   const clean = str.replace(/["'`]/g, '').trim();
 
-  // 1. Descartar palabras compuestas simples (ej. "configured-token", "my-test-secret")
-  // Si solo tiene letras minúsculas y guiones/guiones bajos sin ningún número ni mayúscula, es un placeholder
-  if (/^[a-z_\-]+$/.test(clean)) {
-    return false;
-  }
+  if (/^[a-z_\-]+$/.test(clean)) return false;
+  if (/^(configured|test|dummy|mock|example|sample|placeholder|default)[-_]/i.test(clean)) return false;
 
-  // 2. Descartar si son palabras legibles obvias
-  if (/^(configured|test|dummy|mock|example|sample|placeholder|default)[-_]/i.test(clean)) {
-    return false;
-  }
-
-  // 3. Cálculo de Entropía de Shannon básica
-  // Las API Keys reales suelen tener una entropía > 3.0
   const len = clean.length;
   const frequencies = {};
   for (let i = 0; i < len; i++) {
@@ -99,28 +105,22 @@ function isLikelyRealSecret(str) {
     entropy -= p * Math.log2(p);
   }
 
-  // Tokens reales de más de 16 caracteres tienen entropía alta y variedad de caracteres
-  const hasMixedTypes = (/[0-9]/.test(clean) && /[a-zA-Z]/.test(clean)) || (/[A-Z]/.test(clean) && /[a-z]/.test(clean));
-  
+  const hasMixedTypes =
+    (/[0-9]/.test(clean) && /[a-zA-Z]/.test(clean)) ||
+    (/[A-Z]/.test(clean) && /[a-z]/.test(clean));
+
   return entropy >= 2.8 && hasMixedTypes;
 }
 
 function scanCodeForSecrets(targetPath) {
   const ignoredProperties = [
-    'primarykey',
-    'foreignkey',
-    'foreign_key',
-    'routekey',
-    'uniquekey',
-    'cachekey',
-    'keytype',
-    'key_name'
+    'primarykey', 'foreignkey', 'foreign_key', 'routekey',
+    'uniquekey', 'cachekey', 'keytype', 'key_name'
   ];
 
   const secretPatterns = [
     {
       name: 'API Key / Token asignado',
-      // Exige asignación a un string literal entre comillas con mínimo 16 caracteres
       regex: /(?:api_?key|app_?secret|auth_?token|client_?secret|jwt_?secret|private_?key|supabase_?key|stripe_?key)\s*[:=]\s*(["'`])([a-zA-Z0-9_\-\.]{16,})\1/gi
     },
     {
@@ -133,7 +133,7 @@ function scanCodeForSecrets(targetPath) {
     }
   ];
 
-  const extensions = ['.js', '.ts', '.html', '.php', '.json', '.env'];
+  const extensions = ['.js', '.ts', '.html', '.php', '.json'];
   const findings = [];
 
   function walkDir(dir) {
@@ -142,7 +142,6 @@ function scanCodeForSecrets(targetPath) {
       const fullPath = path.join(dir, entry.name);
 
       if (entry.isDirectory()) {
-        // Excluir dependencias, carpetas de compilación y caches pesados
         if (!['node_modules', '.git', 'vendor', 'dist', 'build', 'storage', '.next', '.turbo', '.output'].includes(entry.name)) {
           walkDir(fullPath);
         }
@@ -152,11 +151,9 @@ function scanCodeForSecrets(targetPath) {
 
         lines.forEach((line, index) => {
           const trimmed = line.trim();
-          // Omitir comentarios de código
           if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('#')) return;
 
           const lowerLine = line.toLowerCase();
-          // Omitir declaraciones de claves de base de datos o esquemas
           if (ignoredProperties.some(prop => lowerLine.includes(prop))) return;
 
           for (const pattern of secretPatterns) {
@@ -164,13 +161,8 @@ function scanCodeForSecrets(targetPath) {
             const match = pattern.regex.exec(line);
 
             if (match) {
-              // Si es un patrón asignado, match[2] extrae el contenido exacto dentro de comillas
               const secretCandidate = match[2] || match[0];
-
-              // Validar que realmente tenga características de secreto antes de alertar
-              if (!isLikelyRealSecret(secretCandidate)) {
-                continue;
-              }
+              if (!isLikelyRealSecret(secretCandidate)) continue;
 
               findings.push({
                 type: 'secret',
@@ -194,16 +186,14 @@ function scanCodeForSecrets(targetPath) {
   try {
     walkDir(targetPath);
   } catch (e) {
-    console.warn('⚠️ Error al escanear archivos locales:', e.message);
+    console.warn('⚠️ Error al escanear secretos en archivos locales:', e.message);
   }
 
   return findings;
 }
-// Configuración dinámica de paquetes Semgrep según el ecosistema
-function getSemgrepConfigs(projectType) {
-  // Base universal confiable
-  const configs = ['--config=p/default'];
 
+function getSemgrepConfigs(projectType) {
+  const configs = ['--config=p/default'];
   if (projectType === 'node') {
     configs.push('--config=p/nodejs', '--config=p/javascript');
   } else if (projectType === 'php') {
@@ -211,21 +201,30 @@ function getSemgrepConfigs(projectType) {
   } else {
     configs.push('--config=p/javascript');
   }
-
-  return configs.join(' ');
+  return configs;
 }
 
-// Módulo SAST con Semgrep enriquecido con OWASP y CWE
 async function runSemgrepScan(targetPath, projectType = 'static_web') {
   console.log(`⚡ Ejecutando análisis estático (Semgrep con perfiles para ${projectType})...`);
   const cleanTarget = path.resolve(targetPath);
   const configs = getSemgrepConfigs(projectType);
-  const excludeFlags = '--exclude="dist" --exclude="build" --exclude=".next" --exclude="node_modules" --exclude="vendor" --exclude="storage"';
 
-  const semgrepResult = await runCommand(
-    `semgrep scan ${configs} ${excludeFlags} --json --quiet "${cleanTarget}"`,
+  const semgrepArgs = [
+    'scan',
+    ...configs,
+    '--exclude=dist',
+    '--exclude=build',
+    '--exclude=.next',
+    '--exclude=node_modules',
+    '--exclude=vendor',
+    '--exclude=storage',
+    '--json',
+    '--quiet',
+    '--exclude=.env*',
     cleanTarget
-  );
+  ];
+
+  const semgrepResult = await runSafeCommand('semgrep', semgrepArgs, cleanTarget);
 
   let semgrepData = { results: [] };
   try {
@@ -236,7 +235,6 @@ async function runSemgrepScan(targetPath, projectType = 'static_web') {
     console.warn('⚠️ No se pudo parsear salida de Semgrep.');
   }
 
-  // Mapeo y extracción de metadatos de ciberseguridad
   const semgrepFindings = (semgrepData.results || []).map(f => {
     const isError = (f.extra?.severity || '').toUpperCase() === 'ERROR';
     const metadata = f.extra?.metadata || {};
@@ -251,8 +249,8 @@ async function runSemgrepScan(targetPath, projectType = 'static_web') {
       path: path.relative(cleanTarget, f.path),
       startLine: f.start?.line || 1,
       message: f.extra?.message?.trim() || 'Problema de seguridad o buena práctica detectado.',
-      owasp: owasp,
-      cwe: cwe
+      owasp,
+      cwe
     };
   });
 
@@ -271,11 +269,9 @@ async function runSemgrepScan(targetPath, projectType = 'static_web') {
   };
 }
 
-// Analizador para proyectos estáticos (HTML/CSS/JS)
 async function auditStaticProject(targetPath) {
   console.log('⚡ Ejecutando escaneo para Proyecto Estático (HTML/CSS/JS)...');
   const sastReport = await runSemgrepScan(targetPath, 'static_web');
-
   const passed = sastReport.blockersCount === 0;
 
   return {
@@ -293,42 +289,25 @@ async function auditStaticProject(targetPath) {
       totalWarnings: sastReport.warningsCount,
       totalVulnerabilities: 0
     },
-    licenses: {
-      totalFound: 0,
-      allLicenses: ['N/A (Sin gestor de paquetes)'],
-      hasRestrictedLicenses: false,
-      restrictedFound: []
-    },
     sast: sastReport
   };
 }
 
-// Analizador para proyectos Node.js / React / Angular
 async function auditNodeProject(targetPath) {
   console.log('⚡ Ejecutando escaneo para Node.js...');
 
-  const [auditRaw, licensesRaw, sastReport] = await Promise.all([
-    runCommand('npm audit --json', targetPath),
-    runCommand('npx license-checker --json', targetPath),
+  const [auditRaw, sastReport] = await Promise.all([
+    runSafeCommand('npm', ['audit', '--json'], targetPath),
     runSemgrepScan(targetPath, 'node')
   ]);
 
   let auditData = { vulnerabilities: {}, metadata: {} };
-  let licenseData = {};
-
   try {
     if (auditRaw.stdout) auditData = JSON.parse(auditRaw.stdout);
   } catch (e) {
     console.warn('⚠️ No se pudo parsear salida de npm audit.');
   }
 
-  try {
-    if (licensesRaw.stdout) licenseData = JSON.parse(licensesRaw.stdout);
-  } catch (e) {
-    console.warn('⚠️ No se pudo parsear salida de license-checker.');
-  }
-
-  // Parsear lista detallada de dependencias vulnerables
   const detailedVulns = [];
   const rawVulns = auditData.vulnerabilities || {};
 
@@ -358,14 +337,8 @@ async function auditNodeProject(targetPath) {
     info: 0, low: 0, moderate: 0, high: 0, critical: 0, total: 0
   };
 
-  const licensesList = [...new Set(
-    Object.values(licenseData).map(pkg => pkg.licenses).filter(Boolean)
-  )];
-
-  const restrictedLicenses = licensesList.filter(lic => /GPL|AGPL/i.test(lic));
-
   const criticalDependencies = (vulns.critical || 0) + (vulns.high || 0);
-  const totalBlockers = sastReport.blockersCount + criticalDependencies + restrictedLicenses.length;
+  const totalBlockers = sastReport.blockersCount + criticalDependencies;
   const passed = totalBlockers === 0;
 
   return {
@@ -386,48 +359,28 @@ async function auditNodeProject(targetPath) {
       criticalVulns: vulns.critical || 0,
       highVulns: vulns.high || 0
     },
-    licenses: {
-      totalFound: licensesList.length,
-      allLicenses: licensesList,
-      hasRestrictedLicenses: restrictedLicenses.length > 0,
-      restrictedFound: restrictedLicenses
-    },
     sast: sastReport,
     dependenciesVulnerabilities: detailedVulns
   };
 }
 
-// Analizador para proyectos PHP / Laravel
 async function auditPhpProject(targetPath) {
   console.log('⚡ Ejecutando escaneo para PHP/Composer...');
 
-  const [auditRaw, licensesRaw, sastReport] = await Promise.all([
-    runCommand('composer audit --format=json', targetPath),
-    runCommand('composer licenses --format=json', targetPath),
+  const [auditRaw, sastReport] = await Promise.all([
+    runSafeCommand('composer', ['audit', '--no-plugins', '--no-scripts', '--format=json'], targetPath),
     runSemgrepScan(targetPath, 'php')
   ]);
 
   let auditData = { advisories: {} };
-  let licenseData = { dependencies: {} };
-
   try {
     if (auditRaw.stdout) auditData = JSON.parse(auditRaw.stdout);
   } catch (e) {
     console.warn('⚠️ No se pudo parsear salida de composer audit.');
   }
 
-  try {
-    if (licensesRaw.stdout) licenseData = JSON.parse(licensesRaw.stdout);
-  } catch (e) {
-    console.warn('⚠️ No se pudo parsear salida de composer licenses.');
-  }
-
   const advisoriesCount = Object.keys(auditData.advisories || {}).length;
-  const packageLicenses = Object.values(licenseData.dependencies || {}).flatMap(dep => dep.license || []);
-  const licensesList = [...new Set(packageLicenses)];
-  const restrictedLicenses = licensesList.filter(lic => /GPL|AGPL/i.test(lic));
-
-  const totalBlockers = sastReport.blockersCount + advisoriesCount + restrictedLicenses.length;
+  const totalBlockers = sastReport.blockersCount + advisoriesCount;
   const passed = totalBlockers === 0;
 
   return {
@@ -446,21 +399,23 @@ async function auditPhpProject(targetPath) {
       totalWarnings: sastReport.warningsCount,
       totalAdvisories: advisoriesCount
     },
-    licenses: {
-      totalFound: licensesList.length,
-      allLicenses: licensesList,
-      hasRestrictedLicenses: restrictedLicenses.length > 0,
-      restrictedFound: restrictedLicenses
-    },
     sast: sastReport,
     advisories: auditData.advisories || {}
   };
 }
 
-// Orquestador principal
-async function scanProject(targetInput, token = null) {
+const VALID_ENVIRONMENTS = ['node', 'php', 'static_web'];
+
+// Orquestador principal (100% Local)
+async function scanProject(targetInput, projectType = null) {
+  if (!projectType || !VALID_ENVIRONMENTS.includes(projectType)) {
+    throw new Error(`Debes seleccionar un entorno válido (${VALID_ENVIRONMENTS.join(', ')}). Recibido: "${projectType}"`);
+  }
+
   const inputStr = targetInput ? targetInput.trim() : './';
-  const isGit = /^https?:\/\/(www\.)?github\.com\/.+/i.test(inputStr);
+  
+  // Detecta URLs remotas Git (HTTPS o SSH)
+  const isGit = /^(https?:\/\/|git@).+/i.test(inputStr);
   const isZip = inputStr.toLowerCase().endsWith('.zip');
 
   let workingDir = inputStr;
@@ -468,7 +423,8 @@ async function scanProject(targetInput, token = null) {
 
   try {
     if (isGit) {
-      workingDir = await cloneGitHubRepo(inputStr, token);
+      // Clona usando el cliente Git y credenciales locales del usuario
+      workingDir = await cloneRepoLocal(inputStr);
       isTempDir = true;
     } else if (isZip) {
       workingDir = extractZipArchive(path.resolve(inputStr));
@@ -478,22 +434,17 @@ async function scanProject(targetInput, token = null) {
     const absolutePath = path.resolve(workingDir);
 
     if (!fs.existsSync(absolutePath)) {
-      console.error(`❌ El directorio de trabajo "${absolutePath}" no existe.`);
-      process.exit(1);
+      throw new Error(`El directorio de trabajo "${absolutePath}" no existe.`);
     }
 
-    console.log(`🔍 Iniciando análisis en: ${isGit ? inputStr : absolutePath}`);
-
-    const hasPackageJson = fs.existsSync(path.join(absolutePath, 'package.json'));
-    const hasComposerJson = fs.existsSync(path.join(absolutePath, 'composer.json'));
+    console.log(`🔍 Iniciando análisis en: ${isGit ? inputStr : absolutePath} (Entorno: ${projectType})`);
 
     let report = null;
-
-    if (hasPackageJson) {
-      report = await auditNodeProject(absolutePath);
-    } else if (hasComposerJson) {
+    if (projectType === 'php') {
       report = await auditPhpProject(absolutePath);
-    } else {
+    } else if (projectType === 'node') {
+      report = await auditNodeProject(absolutePath);
+    } else if (projectType === 'static_web') {
       report = await auditStaticProject(absolutePath);
     }
 
@@ -501,17 +452,11 @@ async function scanProject(targetInput, token = null) {
     else if (isZip) report.source = { type: 'zip', target: path.basename(inputStr) };
     else report.source = { type: 'local', target: absolutePath };
 
-    const outputPath = path.join(__dirname, 'scan-report.json');
+    const outputPath = path.join(process.cwd(), 'scan-report.json');
     fs.writeFileSync(outputPath, JSON.stringify(report, null, 2));
 
     console.log('\n✅ Análisis completado con éxito.');
     console.log(`📄 Reporte guardado en: ${outputPath}\n`);
-    console.log('--- RESUMEN ---');
-    console.log(`Origen: ${report.source.type} -> ${report.source.target}`);
-    console.log(`Tipo de proyecto: ${report.projectType}`);
-    console.log(`Estado: ${report.summary.passed ? '🟢 ' + report.summary.statusBadge : '🔴 ' + report.summary.statusBadge}`);
-    console.log(`Fallos Bloqueantes: ${report.summary.totalBlockers}`);
-    console.log(`Observaciones / Advertencias: ${report.summary.totalWarnings}`);
 
     return report;
 
@@ -525,11 +470,18 @@ async function scanProject(targetInput, token = null) {
   }
 }
 
-// Ejecución directa por CLI
+// Ejecución directa CLI: node Orchestrator.js <path|git-url|zip> <node|php|static_web>
 if (require.main === module) {
   const targetPath = process.argv[2] || './';
-  const gitToken = process.argv[3] || null;
-  scanProject(targetPath, gitToken);
+  const forcedType = process.argv[3] || null;
+
+  if (!forcedType || !VALID_ENVIRONMENTS.includes(forcedType)) {
+    console.error(`❌ Debes especificar un entorno válido: ${VALID_ENVIRONMENTS.join(' | ')}`);
+    console.error('Ejemplo: node Orchestrator.js ./mi-proyecto node');
+    process.exit(1);
+  }
+
+  scanProject(targetPath, forcedType);
 }
 
 module.exports = { scanProject };

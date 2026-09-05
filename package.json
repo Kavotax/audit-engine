@@ -15,6 +15,7 @@
     "express": "^5.2.1",
     "license-checker": "^25.0.1",
     "multer": "^2.3.0",
+    "pdfkit": "^0.20.2",
     "pupeteer": "^0.0.1"
   }
 }
