@@ -79,21 +79,6 @@ Upon completion, execution results will be written to `scan-report.json`.
 
 ---
 
-## Generating the Delivery Report
-
-To compile an exportable HTML delivery certificate from your latest audit:
-
-```bash
-node ReportGenerator.js "Client Project Name"
-```
-
-This outputs `Delivery-Certificate.html` containing:
-* Executive pass/review status badge.
-* Total blocker and observation metrics.
-* Filtered findings categorized with OWASP and CWE classifications.
-
----
-
 ## Supported Environments
 
 | Environment | SAST Engine | Dependency Scanner | Secret Detection |
