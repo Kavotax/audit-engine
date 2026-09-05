@@ -11,8 +11,6 @@
   <div class="max-w-4xl mx-auto py-12 px-4">
     <!-- Header -->
     <div class="text-center mb-8">
-      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 mb-3">
-      </div>
       <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Pre-Delivery Code Audit</h1>
       <p class="mt-2 text-base text-slate-600">Inspect SAST (Semgrep), vulnerable dependencies, and leaked credentials in seconds.</p>
     </div>
@@ -32,32 +30,51 @@
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-6">
       <form id="auditForm" onsubmit="handleAuditSubmit(event)" class="space-y-4">
         
-        <!-- Source Selection -->
+        <!-- Source Selection Tabs -->
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Project source:</label>
+          <label class="block text-sm font-medium text-slate-700 mb-2">Project source:</label>
           <div class="grid grid-cols-2 gap-3">
-            <label class="flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-indigo-600 bg-indigo-50/40 text-indigo-700" id="labelModeFolder">
-              <input type="radio" name="sourceMode" value="folder" checked onchange="switchSourceMode('folder')" class="hidden">
-               Local Directory
-            </label>
-            <label class="flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-slate-200 text-slate-600 hover:bg-slate-50" id="labelModeZip">
-              <input type="radio" name="sourceMode" value="zip" onchange="switchSourceMode('zip')" class="hidden">
-               .ZIP Archive
-            </label>
+            <button 
+              type="button" 
+              id="tabFolder" 
+              onclick="switchSourceMode('folder')" 
+              class="p-3 border rounded-lg text-xs font-semibold transition cursor-pointer border-indigo-600 bg-indigo-50/40 text-indigo-700">
+              Local Directory
+            </button>
+            <button 
+              type="button" 
+              id="tabZip" 
+              onclick="switchSourceMode('zip')" 
+              class="p-3 border rounded-lg text-xs font-semibold transition cursor-pointer border-slate-200 text-slate-600 hover:bg-slate-50">
+              .ZIP Archive
+            </button>
           </div>
         </div>
 
         <!-- Input 1: Local Directory -->
         <div id="fieldFolder">
           <label class="block text-sm font-medium text-slate-700 mb-1">Absolute project path on disk:</label>
-          <input type="text" id="folderPath" placeholder="/home/user/projects/my-app  or  C:\Projects\my-app" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          <input type="text" id="folderPath" placeholder="./my-project  or  /workspace/my-app" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono">
           <p class="text-[11px] text-slate-500 mt-1">Scans directly on your filesystem without duplicating files or using network bandwidth.</p>
         </div>
 
         <!-- Input 2: ZIP File -->
         <div id="fieldZip" class="hidden">
           <label class="block text-sm font-medium text-slate-700 mb-1">Select .zip file:</label>
-          <input type="file" id="zipFile" accept=".zip" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-slate-300 rounded-lg cursor-pointer">
+          <div class="flex items-center gap-3">
+            <label for="projectZip" class="cursor-pointer inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+              Browse...
+            </label>
+            <span id="fileNameDisplay" class="text-sm text-slate-500 font-mono">No file chosen</span>
+            <input 
+              type="file" 
+              id="projectZip" 
+              name="projectZip" 
+              accept=".zip" 
+              class="hidden" 
+              onchange="document.getElementById('fileNameDisplay').textContent = this.files[0] ? this.files[0].name : 'No file chosen'"
+            />
+          </div>
         </div>
 
         <!-- Environment Selector -->
@@ -109,9 +126,9 @@
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 border-b border-slate-100 pb-3">
         <div class="flex items-center gap-1.5">
           <span class="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
-          <button id="filterBtnAll" onclick="setFilter('all')" class="px-2.5 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">All (<span id="countAll">0</span>)</button>
-          <button id="filterBtnBlockers" onclick="setFilter('blockers')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent">Blockers (<span id="countBlockers">0</span>)</button>
-          <button id="filterBtnWarnings" onclick="setFilter('warnings')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent">Warnings (<span id="countWarnings">0</span>)</button>
+          <button id="filterBtnAll" onclick="setFilter('all')" class="px-2.5 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 cursor-pointer">All (<span id="countAll">0</span>)</button>
+          <button id="filterBtnBlockers" onclick="setFilter('blockers')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent cursor-pointer">Blockers (<span id="countBlockers">0</span>)</button>
+          <button id="filterBtnWarnings" onclick="setFilter('warnings')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent cursor-pointer">Warnings (<span id="countWarnings">0</span>)</button>
         </div>
         <div class="text-xs text-slate-500" id="paginationInfo">Showing 0 - 0 of 0</div>
       </div>
@@ -133,11 +150,11 @@
 
         <!-- Pagination Controls -->
         <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-          <button id="btnPrevPage" onclick="changePage(-1)" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+          <button id="btnPrevPage" onclick="changePage(-1)" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
             &larr; Previous
           </button>
           <div id="pageIndicator" class="text-xs font-medium text-slate-600">Page 1 of 1</div>
-          <button id="btnNextPage" onclick="changePage(1)" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+          <button id="btnNextPage" onclick="changePage(1)" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
             Next &rarr;
           </button>
         </div>
@@ -167,17 +184,25 @@
       dismissError();
       currentSourceMode = mode;
 
-      const modes = ['folder', 'zip'];
-      modes.forEach(m => {
-        const inputDiv = document.getElementById(`field${m.charAt(0).toUpperCase() + m.slice(1)}`);
-        const label = document.getElementById(`labelMode${m.charAt(0).toUpperCase() + m.slice(1)}`);
-        const isSelected = m === mode;
+      const tabFolder = document.getElementById('tabFolder');
+      const tabZip = document.getElementById('tabZip');
+      const fieldFolder = document.getElementById('fieldFolder');
+      const fieldZip = document.getElementById('fieldZip');
 
-        inputDiv.classList.toggle('hidden', !isSelected);
-        label.className = isSelected
-          ? 'flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-indigo-600 bg-indigo-50/40 text-indigo-700'
-          : 'flex items-center justify-center p-3 border rounded-lg cursor-pointer text-xs font-semibold transition border-slate-200 text-slate-600 hover:bg-slate-50';
-      });
+      const activeTabClass = 'p-3 border rounded-lg text-xs font-semibold transition cursor-pointer border-indigo-600 bg-indigo-50/40 text-indigo-700';
+      const inactiveTabClass = 'p-3 border rounded-lg text-xs font-semibold transition cursor-pointer border-slate-200 text-slate-600 hover:bg-slate-50';
+
+      if (mode === 'folder') {
+        tabFolder.className = activeTabClass;
+        tabZip.className = inactiveTabClass;
+        fieldFolder.classList.remove('hidden');
+        fieldZip.classList.add('hidden');
+      } else {
+        tabZip.className = activeTabClass;
+        tabFolder.className = inactiveTabClass;
+        fieldZip.classList.remove('hidden');
+        fieldFolder.classList.add('hidden');
+      }
     }
 
     function setLoading(isLoading) {
@@ -207,7 +232,7 @@
           body: JSON.stringify({ folderPath, projectType })
         };
       } else if (currentSourceMode === 'zip') {
-        const fileInput = document.getElementById('zipFile');
+        const fileInput = document.getElementById('projectZip');
         if (!fileInput.files[0]) {
           showError('Please select a valid .zip file to scan.');
           return;
@@ -234,7 +259,7 @@
     }
 
     function isItemCritical(item) {
-      return item.severity === 'CRITICAL' || item.severity === 'HIGH' || item.severity === 'ERROR' || item.category === 'Bloqueante';
+      return item.severity === 'CRITICAL' || item.severity === 'HIGH' || item.severity === 'ERROR' || item.category === 'Blocker' || item.category === 'Bloqueante';
     }
 
     function renderResults(data) {
@@ -291,8 +316,8 @@
     }
 
     function updateFilterButtonsUI() {
-      const activeClass = 'px-2.5 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200';
-      const inactiveClass = 'px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent';
+      const activeClass = 'px-2.5 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 cursor-pointer';
+      const inactiveClass = 'px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100 border border-transparent cursor-pointer';
 
       document.getElementById('filterBtnAll').className = currentFilter === 'all' ? activeClass : inactiveClass;
       document.getElementById('filterBtnBlockers').className = currentFilter === 'blockers' ? activeClass : inactiveClass;
@@ -370,6 +395,11 @@
       document.getElementById('btnPrevPage').disabled = currentPage <= 1;
       document.getElementById('btnNextPage').disabled = currentPage >= maxPages;
     }
+
+    // Explicit default initialization on load
+    document.addEventListener('DOMContentLoaded', () => {
+      switchSourceMode('folder');
+    });
   </script>
 </body>
 </html>
