@@ -106,4 +106,6 @@ This outputs `Delivery-Certificate.html` containing:
 
 ## License
 
-This project is licensed under the AGPLv3(LICENSE).
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+See the full [LICENSE](LICENSE) file for the complete legal text.
