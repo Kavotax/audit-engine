@@ -106,4 +106,4 @@ This outputs `Delivery-Certificate.html` containing:
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the AGPLv3(LICENSE).
